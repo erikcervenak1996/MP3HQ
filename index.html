@@ -1,47 +1,659 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="sk">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MP3HQ | ERIK CERVENAK</title>
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MP3 HIGH QUALITY — ERIK CERVENAK</title>
+
+<!-- CDN knižnice -->
+<script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
+<script src="https://unpkg.com/jsmediatags@3.9.5/dist/jsmediatags.min.js"></script>
+
+<style>
+  :root{
+    --bg:#050507;
+    --panel: rgba(255,255,255,0.04);
+    --accent:#1db954;
+    --muted:#9b9b9b;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;font-family:Inter, system-ui, Arial, sans-serif;background:var(--bg);color:#eee;}
+  .wrap{min-height:100vh;display:flex;flex-direction:column;}
+  /* Header */
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;position:relative;z-index:20;}
+  .brand-left{display:flex;flex-direction:column;align-items:flex-start;}
+  .brand-left .title{font-weight:700;letter-spacing:1px;font-size:18px;color:#fff;}
+  .brand-left .subtitle{font-size:12px;color:var(--muted);margin-top:2px;}
+  .logo-center{position:absolute;left:50%;transform:translateX(-50%);top:8px;pointer-events:none;z-index:21;}
+  #logoCanvas{display:block;}
+  .controls-top-right{display:flex;gap:8px;align-items:center;}
+  .controls-top-right button{background:var(--glass);border:0;color:#eee;padding:8px 10px;border-radius:8px;cursor:pointer;}
+  /* Main panel */
+  main{flex:1;display:flex;align-items:center;justify-content:center;padding:18px;position:relative;overflow:hidden;}
+  #bgCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;}
+  .player-panel{position:relative;z-index:2;width:1100px;max-width:96vw;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);display:grid;grid-template-columns:1fr 420px;gap:18px;}
+  /* Left */
+  .left-area{display:flex;flex-direction:column;gap:12px;padding:8px;}
+  .stage{display:flex;align-items:center;justify-content:center;gap:16px;}
+  .speaker{width:130px;height:190px;background:linear-gradient(180deg,#0b0b0b,#171717);border-radius:10px;display:flex;align-items:center;justify-content:center;position:relative;overflow:visible;}
+  .speaker .cone{width:86%;height:86%;border-radius:50%;background:radial-gradient(circle at 30% 30%, #222, #000);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;transform-origin:center center;}
+  .speaker .membrane{width:80%;height:80%;border-radius:50%;background:radial-gradient(circle at 30% 30%, rgba(80,80,80,0.95), #000);transition:transform 0.06s linear;box-shadow:inset 0 -8px 30px rgba(0,0,0,0.6);}
+  .album{width:320px;height:320px;border-radius:10px;background:linear-gradient(180deg,#111,#050505);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 8px 30px rgba(0,0,0,0.6);overflow:hidden;transform-style:preserve-3d;}
+  .album img{width:100%;height:100%;object-fit:cover;display:block;}
+  .album .placeholder{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;padding:12px;text-align:center;}
+  .controls-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+  .btn{background:var(--glass);border:0;color:#eee;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,0.4);}
+  .btn.big{padding:12px 18px;font-size:16px;}
+  .meta{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;}
+  .song-title{font-size:18px;font-weight:700;}
+  .song-sub{font-size:13px;color:var(--muted);}
+  /* Right */
+  .right-area{display:flex;flex-direction:column;gap:12px;padding:8px;}
+  .viz-canvas{width:100%;height:180px;background:rgba(0,0,0,0.12);border-radius:8px;display:block;}
+  .meter{height:40px;background:rgba(255,255,255,0.02);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+  .playlist-box{background:rgba(0,0,0,0.12);padding:8px;border-radius:8px;max-height:320px;overflow:auto;}
+  table{width:100%;border-collapse:collapse;color:#ddd;font-size:13px;}
+  th,td{padding:8px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);}
+  th{color:var(--muted);font-size:12px;}
+  .fav-btn{background:transparent;border:0;color:#ff6b81;cursor:pointer;font-size:16px;}
+  .small{font-size:12px;color:var(--muted);}
+  footer{padding:12px 18px;text-align:center;color:var(--muted);position:relative;z-index:2;}
+  .footer-effect{height:4px;width:100%;border-radius:4px;background:linear-gradient(90deg, rgba(29,185,84,0.6), rgba(255,255,255,0.06));box-shadow:0 6px 20px rgba(29,185,84,0.08);margin-bottom:8px;}
+  /* Login overlay */
+  .login-screen{position:fixed;inset:0;background:rgba(4,4,6,0.97);display:flex;align-items:center;justify-content:center;z-index:9999;}
+  .login-box{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:20px;border-radius:12px;width:380px;text-align:center;color:#fff;border:1px solid rgba(255,255,255,0.03);}
+  .login-box h2{margin:0 0 8px 0;}
+  .login-box input{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#fff;margin-top:8px;}
+  .login-error{color:#ff9b9b;margin-top:10px;font-size:14px;}
+  .hash-box{margin-top:12px;background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-size:13px;color:#ddd;}
+  /* responsive */
+  @media (max-width:1100px){
+    .player-panel{grid-template-columns:1fr;}
+    .speaker{display:none;}
+  }
+</style>
 </head>
 <body>
+<div class="wrap">
+
+  <!-- LOGIN OVERLAY -->
+  <div id="loginScreen" class="login-screen" aria-hidden="false">
+    <div class="login-box" role="dialog" aria-modal="true" aria-label="Prihlásenie">
+      <h2>Vstup na MP3 HIGH QUALITY</h2>
+      <div class="small">Zadaj heslo pre prístup na stránku.</div>
+
+      <input id="pwInput" type="password" placeholder="Zadaj heslo" autocomplete="new-password" />
+
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+        <button id="enterBtn" class="btn">Vstúpiť</button>
+        <button id="genHashBtn" class="btn">Vygenerovať hash</button>
+      </div>
+
+      <div id="loginError" class="login-error" aria-live="polite" style="display:none;"></div>
+
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);">
+        Pred nasadením: klikni <strong>Vygenerovať hash</strong>, zadaj svoje heslo a skopíruj výsledný SHA-256 hash. (Tento súbor už obsahuje hash, ak chceš zmeniť heslo, vygeneruj nový hash.)
+      </div>
+
+      <div id="hashResult" class="hash-box" style="display:none;margin-top:10px;word-break:break-all;"></div>
+    </div>
+  </div>
+  <!-- END LOGIN -->
+
   <header>
-    <h1>ERIK CERVENAK</h1>
-    <div id="visualizer"></div>
+    <div class="brand-left">
+      <div class="title">MP3 HIGH QUALITY</div>
+      <div class="subtitle">320kbps</div>
+    </div>
+
+    <div class="logo-center">
+      <canvas id="logoCanvas" width="420" height="64" aria-hidden="true"></canvas>
+    </div>
+
+    <div class="controls-top-right">
+      <button id="openRepoBtn" class="btn">Repo</button>
+      <button id="downloadCurrent" class="btn">⬇️ Stiahnuť</button>
+    </div>
   </header>
 
   <main>
-    <div class="player">
-      <img src="images/album.jpg" alt="Album cover" class="album-cover">
-      <h2 id="song-title">Názov piesne</h2>
-      <div class="controls">
-        <button id="prev">⏮️</button>
-        <button id="play">▶️</button>
-        <button id="next">⏭️</button>
-        <button id="like">❤️</button>
+    <canvas id="bgCanvas"></canvas>
+
+    <div class="player-panel" role="application" aria-label="MP3 prehrávač">
+      <div class="left-area">
+        <div class="stage">
+          <div class="speaker" id="speakerLeft">
+            <div class="cone"><div class="membrane" id="memL"></div></div>
+          </div>
+
+          <div class="album" id="albumCover">
+            <div class="rot"><img id="coverImg" alt="Album cover" style="display:none"><div class="placeholder" id="coverPlaceholder">Žiadny cover</div></div>
+          </div>
+
+          <div class="speaker" id="speakerRight">
+            <div class="cone"><div class="membrane" id="memR"></div></div>
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button id="prevBtn" class="btn">⏮️</button>
+          <button id="playBtn" class="btn big">► Play</button>
+          <button id="nextBtn" class="btn">⏭️</button>
+
+          <button id="likeBtn" class="btn">♡ Like</button>
+
+          <label class="small">Speed
+            <select id="rateSelect" style="margin-left:6px;">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+
+          <label style="margin-left:8px;" class="small"><input type="checkbox" id="eqToggle"> Equalizer</label>
+          <label style="margin-left:8px;" class="small"><input type="checkbox" id="megaToggle"> Megabass</label>
+          <label style="margin-left:8px;" class="small">Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+        </div>
+
+        <div class="meta">
+          <div class="song-title" id="songTitle">—</div>
+          <div class="song-sub" id="songMeta">—</div>
+        </div>
+      </div>
+
+      <div class="right-area">
+        <canvas id="vizCanvas" class="viz-canvas"></canvas>
+        <div class="meter" id="bassMeter">Basová intenzita: 0</div>
+
+        <div class="playlist-box" id="playlistBox">
+          <table aria-live="polite">
+            <thead><tr><th>#</th><th>Track</th><th>Interpret</th><th>Album</th><th>Fav</th></tr></thead>
+            <tbody id="playlistTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="small">Tip: Skladby musia byť v hlavnom priečinku repozitára <strong>MP3HQ</strong> (autor: erikcervenak1996).</div>
       </div>
     </div>
-
-    <div class="settings">
-      <label><input type="checkbox" id="eq"> Equalizer ON/OFF</label>
-      <label><input type="checkbox" id="bass"> MegaBass ON/OFF</label>
-    </div>
-
-    <section id="song-list">
-      <h3>Všetky piesne</h3>
-      <ul>
-        <li>Interpret 1 - Song 1</li>
-        <li>Interpret 2 - Song 2</li>
-      </ul>
-    </section>
   </main>
 
   <footer>
-    <p>ERIK CERVENAK | 2025</p>
+    <div class="footer-effect" id="footerEffect"></div>
+    ERIK CERVENAK | 2025
   </footer>
+</div>
 
-  <script src="js/script.js"></script>
+<!-- Skrytý audio element -->
+<audio id="audio" crossorigin="anonymous"></audio>
+
+<script>
+/* ===================== KONFIGURÁCIA ===================== */
+/* SHA-256 hash hesla 'ecmp3hq' */
+const STORED_HASH = 'e041fbf706eff1173c36c7f334d100cc7fbb0703244c4ec218e24b9be32e4323';
+const GITHUB_USER = 'erikcervenak1996';
+const GITHUB_REPO = 'MP3HQ';
+const GITHUB_API = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+
+/* ===================== LOGIN UI ===================== */
+const loginScreen = document.getElementById('loginScreen');
+const pwInput = document.getElementById('pwInput');
+const enterBtn = document.getElementById('enterBtn');
+const genHashBtn = document.getElementById('genHashBtn');
+const loginError = document.getElementById('loginError');
+const hashResult = document.getElementById('hashResult');
+
+function hexFromBuffer(buf){
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function sha256hex(str){
+  const enc = new TextEncoder().encode(str);
+  const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+  return hexFromBuffer(hashBuf);
+}
+
+async function attemptLogin(){
+  const v = pwInput.value || '';
+  if(!v){ loginError.style.display='block'; loginError.textContent = 'Zadaj heslo.'; return; }
+  const h = await sha256hex(v);
+  if(STORED_HASH === 'REPLACE_WITH_SHA256_HASH'){
+    loginError.style.display='block';
+    loginError.textContent = 'Heslo nie je nakonfigurované v súbore.';
+    return;
+  }
+  if(h === STORED_HASH){
+    sessionStorage.setItem('mp3hq_authed','1');
+    hideLoginAndStart();
+  } else {
+    loginError.style.display='block';
+    loginError.textContent = 'nenapísal si to presne alebo heslo nevieš, skús uhádnuť ak nie máš smolu';
+  }
+}
+
+enterBtn.addEventListener('click', attemptLogin);
+pwInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') attemptLogin(); });
+
+genHashBtn.addEventListener('click', async ()=>{
+  const passwd = prompt('Zadaj heslo pre vygenerovanie SHA-256 (lokálne):');
+  if(!passwd) return;
+  const h = await sha256hex(passwd);
+  hashResult.style.display = 'block';
+  hashResult.innerHTML = `<div style="font-size:13px;margin-bottom:6px;">SHA-256 hash (skopíruj a nahraď STORED_HASH v súbore pred uploadom):</div><div style="word-break:break-all; padding:8px; background:rgba(0,0,0,0.12);border-radius:6px;">${h}</div>`;
+});
+
+/* Ak už je session, odblokuj */
+if(sessionStorage.getItem('mp3hq_authed') === '1'){
+  hideLoginAndStart();
+}
+
+function hideLoginAndStart(){
+  loginScreen.style.display = 'none';
+  initApp();
+}
+
+/* ===================== APLIKÁCIA ===================== */
+async function initApp(){
+  /* DOM refs */
+  const logoCanvas = document.getElementById('logoCanvas');
+  const logoCtx = logoCanvas.getContext('2d');
+  const bgCanvas = document.getElementById('bgCanvas');
+  const bgCtx = bgCanvas.getContext('2d');
+  const coverImg = document.getElementById('coverImg');
+  const coverPlaceholder = document.getElementById('coverPlaceholder');
+  const memL = document.getElementById('memL');
+  const memR = document.getElementById('memR');
+  const playBtn = document.getElementById('playBtn');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const likeBtn = document.getElementById('likeBtn');
+  const rateSelect = document.getElementById('rateSelect');
+  const eqToggle = document.getElementById('eqToggle');
+  const megaToggle = document.getElementById('megaToggle');
+  const vol = document.getElementById('vol');
+  const songTitle = document.getElementById('songTitle');
+  const songMeta = document.getElementById('songMeta');
+  const playlistTbody = document.getElementById('playlistTbody');
+  const vizCanvas = document.getElementById('vizCanvas');
+  const vizCtx = vizCanvas.getContext('2d');
+  const bassMeter = document.getElementById('bassMeter');
+  const footerEffect = document.getElementById('footerEffect');
+  const audio = document.getElementById('audio');
+  const downloadCurrent = document.getElementById('downloadCurrent');
+  const openRepoBtn = document.getElementById('openRepoBtn');
+
+  let tracks = [];
+  let currentIndex = 0;
+  let favorites = JSON.parse(localStorage.getItem('mp3hq_favs')||'{}');
+
+  let toneStarted = false;
+  let player;
+  let analyserNode;
+  let eqFilters = {};
+  let megaFilter;
+
+  function resizeCanvases(){
+    bgCanvas.width = bgCanvas.clientWidth * devicePixelRatio;
+    bgCanvas.height = bgCanvas.clientHeight * devicePixelRatio;
+    vizCanvas.width = vizCanvas.clientWidth * devicePixelRatio;
+    vizCanvas.height = vizCanvas.clientHeight * devicePixelRatio;
+    logoCanvas.width = logoCanvas.clientWidth * devicePixelRatio;
+    logoCanvas.height = logoCanvas.clientHeight * devicePixelRatio;
+  }
+  window.addEventListener('resize', resizeCanvases);
+  resizeCanvases();
+
+  function safeText(s){ return (s||'').replace(/\.mp3$/i,''); }
+  function formatMeta(t){ return `${t.artist || '—'} • ${t.album || '—'}`; }
+
+  async function initTone(){
+    if(toneStarted) return;
+    await Tone.start();
+    toneStarted = true;
+
+    player = new Tone.Player({autostart:false, loop:false}).toDestination();
+    analyserNode = new Tone.Analyser('fft', 128);
+    player.connect(analyserNode);
+
+    eqFilters.low = new Tone.Filter({type:'lowshelf', frequency:100, gain:0});
+    eqFilters.mid = new Tone.Filter({type:'peaking', frequency:1000, Q:1, gain:0});
+    eqFilters.high = new Tone.Filter({type:'highshelf', frequency:5000, gain:0});
+    player.disconnect();
+    player.chain(eqFilters.low, eqFilters.mid, eqFilters.high, Tone.Destination);
+    megaFilter = eqFilters.low;
+    requestAnimationFrame(updateVisuals);
+  }
+
+  /* === GitHub API: zoznam mp3 z hlavného priečinka === */
+  async function fetchMp3List(){
+    try {
+      const res = await fetch(GITHUB_API);
+      if(!res.ok) throw new Error('GitHub API error ' + res.status);
+      const data = await res.json();
+      const mp3files = data.filter(item => item.type === 'file' && /\.mp3$/i.test(item.name));
+      tracks = mp3files.map((f, i) => ({
+        name: f.name,
+        url: f.download_url,
+        title: safeText(f.name),
+        artist: '',
+        album: '',
+        coverBlobUrl: null,
+        idx: i
+      }));
+      await readMetadataForTracks();
+      renderPlaylist();
+      if(tracks.length) loadTrack(0);
+    } catch(err){
+      console.error('Chyba pri načítaní zoznamu z GitHub:', err);
+      playlistTbody.innerHTML = `<tr><td colspan="5">Chyba pri načítaní zoznamu: ${err.message}</td></tr>`;
+    }
+  }
+
+  /* ID3 tags (jsmediatags) */
+  async function readMetadataForTracks(){
+    const promises = tracks.map((t, i) => new Promise(resolve => {
+      try {
+        window.jsmediatags.read(t.url, {
+          onSuccess: function(tag) {
+            const tags = tag.tags || {};
+            t.title = tags.title || t.title;
+            t.artist = tags.artist || '';
+            t.album = tags.album || '';
+            if(tags.picture){
+              const pic = tags.picture;
+              const byteArray = new Uint8Array(pic.data);
+              const blob = new Blob([byteArray], {type: pic.format || 'image/jpeg'});
+              t.coverBlobUrl = URL.createObjectURL(blob);
+            }
+            resolve();
+          },
+          onError: function(err){
+            resolve();
+          }
+        });
+      } catch(e){
+        resolve();
+      }
+    }));
+    await Promise.all(promises);
+  }
+
+  function renderPlaylist(){
+    playlistTbody.innerHTML = '';
+    tracks.forEach((t, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="width:30px">${idx+1}</td>
+        <td style="cursor:pointer">${t.title}</td>
+        <td>${t.artist || '—'}</td>
+        <td>${t.album || '—'}</td>
+        <td style="width:60px"><button class="fav-btn" data-idx="${idx}">${favorites[t.url] ? '❤️' : '♡'}</button></td>
+      `;
+      tr.querySelector('td:nth-child(2)').addEventListener('click', ()=> {
+        loadTrack(idx);
+        play();
+      });
+      tr.querySelector('.fav-btn').addEventListener('click', (e)=> {
+        const k = tracks[idx].url;
+        if(favorites[k]) delete favorites[k]; else favorites[k] = true;
+        localStorage.setItem('mp3hq_favs', JSON.stringify(favorites));
+        renderPlaylist();
+        e.stopPropagation();
+      });
+      playlistTbody.appendChild(tr);
+    });
+  }
+
+  async function loadTrack(index){
+    if(!tracks[index]) return;
+    currentIndex = index;
+    const t = tracks[index];
+    songTitle.textContent = t.title;
+    songMeta.textContent = formatMeta(t);
+    if(t.coverBlobUrl){
+      coverImg.src = t.coverBlobUrl;
+      coverImg.style.display = 'block';
+      coverPlaceholder.style.display = 'none';
+    } else {
+      const jpgUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/${t.name.replace(/\.mp3$/i,'.jpg')}`;
+      coverImg.onerror = ()=>{ coverImg.style.display='none'; coverPlaceholder.style.display='block'; };
+      coverImg.onload = ()=>{ coverImg.style.display='block'; coverPlaceholder.style.display='none'; };
+      coverImg.src = jpgUrl;
+    }
+    audio.crossOrigin = "anonymous";
+    audio.src = t.url;
+    await initTone();
+    try {
+      await player.load(t.url);
+    } catch(e){
+      console.warn('Tone.Player load failed, fallback to HTMLAudio for playback', e);
+    }
+    Array.from(document.querySelectorAll('#playlistTbody tr')).forEach((tr,i)=> tr.style.background = (i===index)?'linear-gradient(90deg, rgba(29,185,84,0.06), rgba(255,255,255,0.01))':'transparent');
+  }
+
+  function play(){
+    if(!toneStarted) initTone();
+    if(player.buffer && player.state !== 'started'){
+      player.start();
+      playBtn.textContent = '⏸ Pause';
+    } else if(player.state === 'started'){
+      player.stop();
+      playBtn.textContent = '► Play';
+    } else {
+      audio.play();
+      playBtn.textContent = '⏸ Pause';
+    }
+  }
+  function stop(){
+    if(player && player.state === 'started') player.stop();
+    else audio.pause();
+    playBtn.textContent = '► Play';
+  }
+
+  function nextTrack(){ const next = (currentIndex+1)%tracks.length; loadTrack(next); play(); }
+  function prevTrack(){ const prev = (currentIndex-1+tracks.length)%tracks.length; loadTrack(prev); play(); }
+
+  const EQ_PRESETS = {
+    'Flat': {low:0, mid:0, high:0},
+    'Bass Boost': {low:6, mid:0, high:-2},
+    'Pop': {low:2, mid:1, high:3},
+    'Rock': {low:3, mid:2, high:2},
+    'Vocal': {low:-1, mid:3, high:2}
+  };
+  function applyEQPreset(name){
+    const p = EQ_PRESETS[name] || EQ_PRESETS.Flat;
+    eqFilters.low.gain.value = p.low;
+    eqFilters.mid.gain.value = p.mid;
+    eqFilters.high.gain.value = p.high;
+  }
+  function setMegabass(enabled, value){
+    if(enabled){
+      megaFilter.gain.value = value;
+    } else {
+      megaFilter.gain.value = 0;
+    }
+  }
+
+  function updateVisuals(){
+    if(analyserNode){
+      const vals = analyserNode.getValue();
+      const mag = vals.map(v => Math.abs(v));
+      const bass = mag.slice(0,8).reduce((a,b)=>a+b,0) / 8;
+      bassMeter.textContent = 'Basová intenzita: ' + (bass.toFixed(3));
+      const scale = 1 + Math.min(0.6, bass*1.6);
+      memL.style.transform = `scale(${scale})`;
+      memR.style.transform = `scale(${scale})`;
+      const g = Math.min(255, Math.floor(80 + bass*300));
+      footerEffect.style.background = `linear-gradient(90deg, rgba(29,${g},84,0.7), rgba(255,255,255,0.06))`;
+    }
+    vizCtx.clearRect(0,0,vizCanvas.width,vizCanvas.height);
+    if(analyserNode){
+      const fdata = analyserNode.getValue();
+      const bins = fdata.length;
+      const w = vizCanvas.width, h = vizCanvas.height;
+      const barCount = 48;
+      const barW = Math.floor(w / barCount);
+      for(let i=0;i<barCount;i++){
+        const idx = Math.floor(i * (bins / barCount));
+        const v = Math.abs(fdata[idx]);
+        const hh = Math.min(h, v * h * 1.6);
+        const x = i * barW;
+        vizCtx.fillStyle = `rgba(${50 + i*3}, ${120 + Math.floor(Math.min(120, v*300))}, ${200 - i}, ${0.9})`;
+        vizCtx.fillRect(x, h - hh, barW*0.9, hh);
+      }
+    } else {
+      vizCtx.fillStyle = 'rgba(255,255,255,0.02)';
+      vizCtx.fillRect(0,0,vizCanvas.width,vizCanvas.height);
+    }
+    drawBackground();
+    drawLogoBars();
+    requestAnimationFrame(updateVisuals);
+  }
+
+  let bgPhase=0;
+  function drawBackground(){
+    bgCtx.fillStyle = 'rgba(5,5,7,0.12)';
+    bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height);
+    bgPhase += 0.02;
+    const cx = bgCanvas.width/2, cy = bgCanvas.height/2;
+    const maxR = Math.min(bgCanvas.width, bgCanvas.height) * 0.6;
+    const grd = bgCtx.createRadialGradient(cx,cy, maxR*0.05, cx,cy, maxR*0.9);
+    grd.addColorStop(0, `rgba(29,185,84,0.06)`);
+    grd.addColorStop(1, `rgba(6,6,8,0)`);
+    bgCtx.beginPath();
+    bgCtx.fillStyle = grd;
+    bgCtx.arc(cx,cy, maxR*0.45 * (0.9 + Math.sin(bgPhase)*0.08), 0, Math.PI*2);
+    bgCtx.fill();
+  }
+
+  let logoBarsPhase = 0;
+  function drawLogoBars(){
+    const cw = logoCanvas.width, ch = logoCanvas.height;
+    logoCtx.clearRect(0,0,cw,ch);
+    const barW = Math.max(3, Math.floor(cw / 70));
+    const barCount = Math.floor(cw / (barW+2));
+    logoBarsPhase += 0.03;
+    logoCtx.save();
+    logoCtx.fillStyle = '#000';
+    logoCtx.font = `${Math.floor(ch*0.6)}px "Inter", Arial`;
+    logoCtx.textAlign = 'center';
+    logoCtx.textBaseline = 'middle';
+    const text = 'ERIK CERVENAK';
+    // draw text to create clipping region
+    logoCtx.beginPath();
+    logoCtx.fillText(text, cw/2, ch/2);
+    logoCtx.globalCompositeOperation = 'source-in';
+    for(let i=0;i<barCount;i++){
+      const x = i*(barW+2);
+      const h = (Math.abs(Math.sin(logoBarsPhase + i*0.12)) * ch * 0.8);
+      logoCtx.fillStyle = `rgba(255,255,255,0.95)`;
+      logoCtx.fillRect(x, ch - h, barW, h);
+    }
+    logoCtx.globalCompositeOperation = 'source-over';
+    logoCtx.restore();
+    logoCtx.fillStyle = '#000';
+    logoCtx.font = `${Math.floor(ch*0.6)}px "Inter", Arial`;
+    logoCtx.textAlign = 'center';
+    logoCtx.textBaseline = 'middle';
+    logoCtx.fillText(text, cw/2, ch/2);
+  }
+
+  function setPlayBtnState(isPlaying){ playBtn.textContent = isPlaying ? '⏸ Pause' : '► Play'; }
+
+  playBtn.addEventListener('click', async ()=> {
+    if(!toneStarted) await initTone();
+    if(player && player.buffer && player.state !== 'started'){
+      player.start(); setPlayBtnState(true);
+    } else if(player && player.state === 'started'){
+      player.stop(); setPlayBtnState(false);
+    } else {
+      if(audio.paused) { audio.play(); setPlayBtnState(true); } else { audio.pause(); setPlayBtnState(false); }
+    }
+  });
+
+  prevBtn.addEventListener('click', ()=> { prevTrack(); });
+  nextBtn.addEventListener('click', ()=> { nextTrack(); });
+
+  likeBtn.addEventListener('click', ()=> {
+    const t = tracks[currentIndex];
+    if(!t) return;
+    if(favorites[t.url]) delete favorites[t.url]; else favorites[t.url] = true;
+    localStorage.setItem('mp3hq_favs', JSON.stringify(favorites));
+    likeBtn.textContent = favorites[t.url] ? '❤️ Liked' : '♡ Like';
+    renderPlaylist();
+  });
+
+  rateSelect.addEventListener('change', ()=> {
+    const r = parseFloat(rateSelect.value);
+    if(player && player.buffer) player.playbackRate = r;
+    audio.playbackRate = r;
+  });
+
+  eqToggle.addEventListener('change', ()=> {
+    if(eqToggle.checked){
+      const preset = prompt('Zvoľ predvoľbu EQ: Flat, Bass Boost, Pop, Rock, Vocal', 'Bass Boost');
+      applyEQPreset(preset || 'Flat');
+    } else {
+      applyEQPreset('Flat');
+    }
+  });
+
+  megaToggle.addEventListener('change', ()=> {
+    if(megaToggle.checked){
+      const db = parseFloat(prompt('Nastav megabass (dB, odporúča sa 0..12):', '6')) || 6;
+      setMegabass(true, db);
+    } else {
+      setMegabass(false, 0);
+    }
+  });
+
+  vol.addEventListener('input', ()=> {
+    const v = parseFloat(vol.value);
+    if(player) player.volume.value = 20*Math.log10(Math.max(v,0.001));
+    audio.volume = v;
+  });
+
+  downloadCurrent.addEventListener('click', ()=> {
+    const t = tracks[currentIndex];
+    if(!t) return alert('Žiadna skladba nie je vybraná.');
+    const a = document.createElement('a');
+    a.href = t.url;
+    a.download = t.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  openRepoBtn.addEventListener('click', ()=> {
+    window.open(`https://github.com/${GITHUB_USER}/${GITHUB_REPO}`, '_blank');
+  });
+
+  let analyserFromAudio = null;
+  function setupAudioElementAnalyser(){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const source = ctx.createMediaElementSource(audio);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+    analyserFromAudio = analyser;
+  }
+
+  player?.onstop?.(() => setPlayBtnState(false));
+
+  (async function start(){
+    resizeCanvases();
+    drawLogoBars();
+    await fetchMp3List();
+    setupAudioElementAnalyser();
+    requestAnimationFrame(updateVisuals);
+  })();
+} // end initApp
+
+</script>
 </body>
 </html>
