@@ -1,0 +1,46 @@
+body {
+  background: #0a0a0a;
+  color: white;
+  font-family: 'Poppins', sans-serif;
+  text-align: center;
+  margin: 0;
+}
+
+header h1 {
+  font-size: 2em;
+  color: black;
+  background: white;
+  display: inline-block;
+  padding: 10px 20px;
+  margin-top: 20px;
+  border-radius: 8px;
+}
+
+.album-cover {
+  width: 200px;
+  border-radius: 10px;
+  margin: 20px 0;
+  box-shadow: 0 0 20px #fff;
+}
+
+.controls button {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: white;
+  margin: 10px;
+  cursor: pointer;
+}
+
+footer {
+  margin-top: 30px;
+  padding: 20px;
+  background: linear-gradient(45deg, #111, #333);
+  animation: pulse 3s infinite;
+}
+
+@keyframes pulse {
+  0% { background: #111; }
+  50% { background: #222; }
+  100% { background: #111; }
+}
